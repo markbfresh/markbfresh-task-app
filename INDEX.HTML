@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Task Flow Manager</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --danger: #ef4444;
+      --badge-template: #8b5cf6;
+      --badge-onetime: #0ea5e9;
+      --success: #22c55e;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 24px 16px; display: flex; justify-content: center; min-height: 100vh; }
+    .container { width: 100%; max-width: 900px; display: flex; flex-direction: column; gap: 20px; }
+
+    /* Header & Sync Status */
+    header { display: flex; flex-direction: column; gap: 12px; }
+    .header-top { display: flex; justify-content: space-between; align-items: center; }
+    h1 { font-size: 1.75rem; font-weight: 700; }
+    .sync-status { font-size: 0.8rem; display: flex; align-items: center; gap: 6px; color: var(--text-muted); }
+    .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #eab308; }
+    .sync-dot.connected { background: var(--success); }
+
+    /* Creation Form */
+    .create-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .input-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    input[type="text"] { flex: 1; min-width: 200px; background: #0b1120; border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 0.95rem; }
+    input[type="text"]:focus { outline: 2px solid var(--primary); border-color: transparent; }
+    select { background: #0b1120; border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 0.95rem; }
+    
+    button { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 10px 16px; font-weight: 600; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    button:hover { background: var(--primary-hover); }
+    button.btn-subtle { background: #334155; }
+    button.btn-subtle:hover { background: #475569; }
+    button.btn-danger { background: transparent; color: var(--danger); padding: 6px 10px; }
+    button.btn-danger:hover { background: rgba(239, 68, 68, 0.1); }
+
+    /* Tasks Grid */
+    .task-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; }
+    @media (max-width: 640px) { .task-grid { grid-template-columns: 1fr; } }
+
+    /* Parent Task Card */
+    .task-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2); }
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .card-title-group { display: flex; flex-direction: column; gap: 4px; }
+    .card-title { font-size: 1.15rem; font-weight: 600; }
+    .badge { font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 6px; width: fit-content; text-transform: uppercase; }
+    .badge-template { background: rgba(139, 92, 246, 0.2); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.3); }
+    .badge-onetime { background: rgba(14, 165, 233, 0.2); color: #7dd3fc; border: 1px solid rgba(14, 165, 233, 0.3); }
+
+    /* Gradient Progress Bar */
+    .progress-container { display: flex; flex-direction: column; gap: 6px; }
+    .progress-labels { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted); }
+    .progress-track { width: 100%; height: 8px; background: #0b1120; border-radius: 999px; overflow: hidden; }
+    .progress-fill { height: 100%; width: 0%; border-radius: 999px; transition: width 0.3s ease, background-color 0.3s ease; }
+
+    /* Subtask List */
+    .subtask-list { display: flex; flex-direction: column; gap: 8px; list-style: none; }
+    .subtask-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #0b1120; padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03); }
+    .subtask-left { display: flex; align-items: center; gap: 10px; flex: 1; }
+    .subtask-item input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--success); }
+    .subtask-title { font-size: 0.95rem; color: var(--text); transition: opacity 0.2s; word-break: break-word; }
+    .subtask-item.completed .subtask-title { text-decoration: line-through; color: var(--text-muted); opacity: 0.7; }
+
+    /* Card Actions */
+    .card-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 8px; border-top: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="header-top">
+      <h1>Cloud Task Flow</h1>
+      <div class="sync-status">
+        <span class="sync-dot" id="syncDot"></span>
+        <span id="syncText">Connecting to Cloud...</span>
+      </div>
+    </div>
+    <div class="create-card">
+      <div class="input-row">
+        <input type="text" id="parentInput" placeholder="Add parent task box (e.g. Wedding Setup, Marketing Campaign)...">
+        <select id="typeSelect">
+          <option value="template">Reusable Template</option>
+          <option value="onetime">One-Time Use</option>
+        </select>
+        <button id="createBtn">+ Create Task</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="task-grid" id="taskGrid"></div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  // --- REPLACE WITH YOUR FIREBASE CONFIG ---
+  const firebaseConfig = {
+    apiKey: "AIzaSyAowTWapsWI-NosV5sn1xBpoUVMzp73XS0",
+    authDomain: "markbfresh-task-app.firebaseapp.com",
+    projectId: "markbfresh-task-app",
+    storageBucket: "markbfresh-task-app.firebasestorage.app",
+    messagingSenderId: "102253290218",
+    appId: "1:102253290218:web:ed1a72e8538f979e936d93"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const tasksCol = collection(db, "user_tasks");
+
+  let tasks = [];
+
+  // Real-time Cloud Listener
+  onSnapshot(tasksCol, (snapshot) => {
+    document.getElementById('syncDot').classList.add('connected');
+    document.getElementById('syncText').innerText = "Live Cloud Sync Active";
+    
+    tasks = [];
+    snapshot.forEach(docSnap => {
+      tasks.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    
+    // Sort so newest or templates stay organized
+    tasks.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    renderTasks();
+  }, (error) => {
+    console.error("Firebase sync error:", error);
+    document.getElementById('syncDot').classList.remove('connected');
+    document.getElementById('syncText').innerText = "Sync Error / Offline";
+  });
+
+  function getGradientColor(pct) {
+    if (pct === 0) return '#ef4444';
+    let r, g, b;
+    if (pct < 50) {
+      const factor = pct / 50;
+      r = Math.round(239 + (234 - 239) * factor);
+      g = Math.round(68 + (179 - 68) * factor);
+      b = Math.round(68 + (8 - 68) * factor);
+    } else {
+      const factor = (pct - 50) / 50;
+      r = Math.round(234 + (34 - 234) * factor);
+      g = Math.round(179 + (197 - 179) * factor);
+      b = Math.round(8 + (94 - 8) * factor);
+    }
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+
+  function renderTasks() {
+    const grid = document.getElementById('taskGrid');
+    grid.innerHTML = '';
+
+    tasks.forEach(task => {
+      const subtasks = task.subtasks || [];
+      const completedCount = subtasks.filter(s => s.completed).length;
+      const totalCount = subtasks.length;
+      const pct = totalCount === 0 ? 0 : Math.round((completedCount / totalCount) * 100);
+      const barColor = getGradientColor(pct);
+
+      const card = document.createElement('div');
+      card.className = 'task-card';
+
+      card.innerHTML = `
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="badge ${task.type === 'template' ? 'badge-template' : 'badge-onetime'}">
+              ${task.type === 'template' ? '🔄 Reusable Template' : '📌 One-Time'}
+            </span>
+            <div class="card-title">${escapeHtml(task.title)}</div>
+          </div>
+          <button class="btn-danger" title="Delete Task Box" data-action="deleteTask" data-taskid="${task.id}">✕</button>
+        </div>
+
+        <div class="progress-container">
+          <div class="progress-labels">
+            <span>Progress</span>
+            <span>${completedCount}/${totalCount} completed (${pct}%)</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" style="width: ${pct}%; background-color: ${barColor};"></div>
+          </div>
+        </div>
+
+        <ul class="subtask-list">
+          ${subtasks.map(s => `
+            <li class="subtask-item ${s.completed ? 'completed' : ''}">
+              <label class="subtask-left">
+                <input type="checkbox" ${s.completed ? 'checked' : ''} data-action="toggleSubtask" data-taskid="${task.id}" data-subid="${s.id}">
+                <span class="subtask-title">${escapeHtml(s.title)}</span>
+              </label>
+              <button class="btn-danger" data-action="deleteSubtask" data-taskid="${task.id}" data-subid="${s.id}">✕</button>
+            </li>
+          `).join('')}
+        </ul>
+
+        <div class="input-row">
+          <input type="text" id="subInput-${task.id}" placeholder="Add subtask...">
+          <button class="btn-subtle" data-action="addSubtask" data-taskid="${task.id}">+</button>
+        </div>
+
+        <div class="card-actions">
+          ${task.type === 'template' ? `
+            <button class="btn-subtle" data-action="resetChecks" data-taskid="${task.id}">Reset Checks</button>
+            <button class="btn-subtle" data-action="duplicateTask" data-taskid="${task.id}">Duplicate</button>
+          ` : ''}
+          <button class="btn-danger" data-action="deleteTask" data-taskid="${task.id}">Delete Box</button>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  // Cloud Actions
+  window.createParentTask = async () => {
+    const input = document.getElementById('parentInput');
+    const typeSelect = document.getElementById('typeSelect');
+    const title = input.value.trim();
+    if (!title) return;
+
+    const id = Date.now().toString();
+    await setDoc(doc(db, "user_tasks", id), {
+      title: title,
+      type: typeSelect.value,
+      createdAt: Date.now(),
+      subtasks: []
+    });
+    input.value = '';
+  };
+
+  async function addSubtask(taskId) {
+    const input = document.getElementById(`subInput-${taskId}`);
+    const title = input.value.trim();
+    if (!title) return;
+
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      const updated = [...(task.subtasks || []), { id: Date.now().toString(), title, completed: false }];
+      await updateDoc(doc(db, "user_tasks", taskId), { subtasks: updated });
+    }
+  }
+
+  async function toggleSubtask(taskId, subId) {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      const updated = task.subtasks.map(s => s.id === subId ? { ...s, completed: !s.completed } : s);
+      await updateDoc(doc(db, "user_tasks", taskId), { subtasks: updated });
+    }
+  }
+
+  async function deleteSubtask(taskId, subId) {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      const updated = task.subtasks.filter(s => s.id !== subId);
+      await updateDoc(doc(db, "user_tasks", taskId), { subtasks: updated });
+    }
+  }
+
+  async function resetChecks(taskId) {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      const updated = task.subtasks.map(s => ({ ...s, completed: false }));
+      await updateDoc(doc(db, "user_tasks", taskId), { subtasks: updated });
+    }
+  }
+
+  async function duplicateTask(taskId) {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      const newId = Date.now().toString();
+      await setDoc(doc(db, "user_tasks", newId), {
+        title: `${task.title} (Copy)`,
+        type: task.type,
+        createdAt: Date.now(),
+        subtasks: task.subtasks.map(s => ({ id: Date.now().toString() + Math.random(), title: s.title, completed: false }))
+      });
+    }
+  }
+
+  async function deleteTask(taskId) {
+    await deleteDoc(doc(db, "user_tasks", taskId));
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
+  }
+
+  // Event Listeners
+  document.getElementById('createBtn').addEventListener('click', window.createParentTask);
+  document.getElementById('parentInput').addEventListener('keydown', (e) => { if(e.key === 'Enter') window.createParentTask(); });
+
+  document.getElementById('taskGrid').addEventListener('click', (e) => {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    const action = target.dataset.action;
+    const taskId = target.dataset.taskid;
+    const subId = target.dataset.subid;
+
+    if (action === 'deleteTask') deleteTask(taskId);
+    if (action === 'addSubtask') addSubtask(taskId);
+    if (action === 'resetChecks') resetChecks(taskId);
+    if (action === 'duplicateTask') duplicateTask(taskId);
+    if (action === 'deleteSubtask') deleteSubtask(taskId, subId);
+  });
+
+  document.getElementById('taskGrid').addEventListener('change', (e) => {
+    if (e.target.dataset.action === 'toggleSubtask') {
+      toggleSubtask(e.target.dataset.taskid, e.target.dataset.subid);
+    }
+  });
+
+  document.getElementById('taskGrid').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.id && e.target.id.startsWith('subInput-')) {
+      const taskId = e.target.id.replace('subInput-', '');
+      addSubtask(taskId);
+    }
+  });
+</script>
+</body>
+</html>
