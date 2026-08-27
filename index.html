@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cloud Task Flow Manager</title>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
   <style>
     :root {
       --bg: #0f172a;
@@ -17,11 +18,14 @@
       --badge-template: #8b5cf6;
       --badge-onetime: #0ea5e9;
       --success: #22c55e;
+      --prio-high: #ef4444;
+      --prio-med: #f59e0b;
+      --prio-low: #38bdf8;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: var(--bg); color: var(--text); padding: 24px 16px; display: flex; justify-content: center; min-height: 100vh; }
-    .container { width: 100%; max-width: 900px; display: flex; flex-direction: column; gap: 20px; }
+    .container { width: 100%; max-width: 960px; display: flex; flex-direction: column; gap: 20px; }
 
     /* Header & Sync Status */
     header { display: flex; flex-direction: column; gap: 12px; }
@@ -34,43 +38,72 @@
     /* Creation Form */
     .create-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
     .input-row { display: flex; gap: 8px; flex-wrap: wrap; }
-    input[type="text"] { flex: 1; min-width: 200px; background: #0b1120; border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 0.95rem; }
-    input[type="text"]:focus { outline: 2px solid var(--primary); border-color: transparent; }
-    select { background: #0b1120; border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 0.95rem; }
-    
-    button { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 10px 16px; font-weight: 600; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    input[type="text"], input[type="date"], select { background: #0b1120; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text); font-size: 0.9rem; }
+    input[type="text"]:focus, input[type="date"]:focus, select:focus { outline: 2px solid var(--primary); border-color: transparent; }
+    input[type="text"] { flex: 1; min-width: 180px; }
+    input[type="date"] { color-scheme: dark; }
+
+    button { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 8px 14px; font-weight: 600; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
     button:hover { background: var(--primary-hover); }
     button.btn-subtle { background: #334155; }
     button.btn-subtle:hover { background: #475569; }
-    button.btn-danger { background: transparent; color: var(--danger); padding: 6px 10px; }
+    button.btn-danger { background: transparent; color: var(--danger); padding: 4px 8px; }
     button.btn-danger:hover { background: rgba(239, 68, 68, 0.1); }
 
     /* Tasks Grid */
-    .task-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; }
+    .task-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; }
     @media (max-width: 640px) { .task-grid { grid-template-columns: 1fr; } }
 
     /* Parent Task Card */
     .task-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2); }
     .card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-    .card-title-group { display: flex; flex-direction: column; gap: 4px; }
-    .card-title { font-size: 1.15rem; font-weight: 600; }
+    .card-title-group { display: flex; align-items: flex-start; gap: 10px; flex: 1; }
+    .card-title-content { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+    
+    /* Inline Editable Titles */
+    .editable-title { font-size: 1.15rem; font-weight: 600; border-radius: 4px; padding: 2px 6px; cursor: text; border: 1px solid transparent; transition: background 0.15s, border-color 0.15s; outline: none; }
+    .editable-title:hover { background: rgba(255, 255, 255, 0.05); border-color: var(--border); }
+    .editable-title:focus { background: #0b1120; border-color: var(--primary); }
+
     .badge { font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 6px; width: fit-content; text-transform: uppercase; }
     .badge-template { background: rgba(139, 92, 246, 0.2); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.3); }
     .badge-onetime { background: rgba(14, 165, 233, 0.2); color: #7dd3fc; border: 1px solid rgba(14, 165, 233, 0.3); }
 
-    /* Gradient Progress Bar */
+    /* Drag Handles */
+    .drag-handle-card, .drag-handle-sub { cursor: grab; color: var(--text-muted); font-size: 1.2rem; line-height: 1; padding: 2px 4px; opacity: 0.6; user-select: none; }
+    .drag-handle-card:hover, .drag-handle-sub:hover { opacity: 1; color: var(--text); }
+    .drag-handle-card:active, .drag-handle-sub:active { cursor: grabbing; }
+    .sortable-ghost { opacity: 0.35; background: rgba(59, 130, 246, 0.15) !important; border: 1px dashed var(--primary) !important; }
+
+    /* Progress Bar */
     .progress-container { display: flex; flex-direction: column; gap: 6px; }
     .progress-labels { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted); }
     .progress-track { width: 100%; height: 8px; background: #0b1120; border-radius: 999px; overflow: hidden; }
     .progress-fill { height: 100%; width: 0%; border-radius: 999px; transition: width 0.3s ease, background-color 0.3s ease; }
 
     /* Subtask List */
-    .subtask-list { display: flex; flex-direction: column; gap: 8px; list-style: none; }
-    .subtask-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #0b1120; padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03); }
-    .subtask-left { display: flex; align-items: center; gap: 10px; flex: 1; }
-    .subtask-item input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--success); }
-    .subtask-title { font-size: 0.95rem; color: var(--text); transition: opacity 0.2s; word-break: break-word; }
-    .subtask-item.completed .subtask-title { text-decoration: line-through; color: var(--text-muted); opacity: 0.7; }
+    .subtask-list { display: flex; flex-direction: column; gap: 8px; list-style: none; min-height: 6px; }
+    .subtask-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #0b1120; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03); }
+    .subtask-left { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+    .subtask-item input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--success); flex-shrink: 0; }
+    
+    .editable-subtask { font-size: 0.95rem; color: var(--text); border-radius: 4px; padding: 2px 4px; cursor: text; border: 1px solid transparent; flex: 1; min-width: 0; overflow-wrap: break-word; outline: none; }
+    .editable-subtask:hover { background: rgba(255, 255, 255, 0.05); border-color: var(--border); }
+    .editable-subtask:focus { background: var(--card-bg); border-color: var(--primary); }
+    .subtask-item.completed .editable-subtask { text-decoration: line-through; color: var(--text-muted); opacity: 0.7; }
+
+    /* Meta Badges (Priority / Due Date) */
+    .subtask-meta { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .prio-badge { font-size: 0.7rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; text-transform: uppercase; }
+    .prio-high { background: rgba(239, 68, 68, 0.2); color: var(--prio-high); border: 1px solid rgba(239, 68, 68, 0.4); }
+    .prio-med { background: rgba(245, 158, 11, 0.2); color: var(--prio-med); border: 1px solid rgba(245, 158, 11, 0.4); }
+    .prio-low { background: rgba(56, 189, 248, 0.2); color: var(--prio-low); border: 1px solid rgba(56, 189, 248, 0.4); }
+    .due-badge { font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 3px; }
+    .due-badge.overdue { color: var(--danger); font-weight: 600; }
+
+    /* Subtask Input Form Controls */
+    .sub-input-form { display: flex; flex-direction: column; gap: 6px; background: rgba(0, 0, 0, 0.2); padding: 8px; border-radius: 8px; border: 1px solid var(--border); }
+    .sub-input-meta-row { display: flex; gap: 6px; flex-wrap: wrap; }
 
     /* Card Actions */
     .card-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 8px; border-top: 1px solid var(--border); }
@@ -89,7 +122,7 @@
     </div>
     <div class="create-card">
       <div class="input-row">
-        <input type="text" id="parentInput" placeholder="Add parent task box (e.g. Wedding Setup, Marketing Campaign)...">
+        <input type="text" id="parentInput" placeholder="Add parent task box (e.g. Wedding Setup, Invoicing, Car Maintenance)...">
         <select id="typeSelect">
           <option value="template">Reusable Template</option>
           <option value="onetime">One-Time Use</option>
@@ -106,8 +139,8 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-  // --- REPLACE WITH YOUR FIREBASE CONFIG ---
-  const firebaseConfig = {
+  // --- PASTE YOUR FIREBASE CONFIG HERE ---
+const firebaseConfig = {
     apiKey: "AIzaSyAowTWapsWI-NosV5sn1xBpoUVMzp73XS0",
     authDomain: "markbfresh-task-app.firebaseapp.com",
     projectId: "markbfresh-task-app",
@@ -121,24 +154,25 @@
   const tasksCol = collection(db, "user_tasks");
 
   let tasks = [];
+  let isInteracting = false;
 
-  // Real-time Cloud Listener
   onSnapshot(tasksCol, (snapshot) => {
     document.getElementById('syncDot').classList.add('connected');
     document.getElementById('syncText').innerText = "Live Cloud Sync Active";
     
+    if (isInteracting) return; // Prevent overwriting active input/drag focus
+
     tasks = [];
     snapshot.forEach(docSnap => {
       tasks.push({ id: docSnap.id, ...docSnap.data() });
     });
     
-    // Sort so newest or templates stay organized
-    tasks.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    tasks.sort((a, b) => (a.orderIndex ?? (b.createdAt || 0)) - (b.orderIndex ?? (a.createdAt || 0)));
     renderTasks();
   }, (error) => {
     console.error("Firebase sync error:", error);
     document.getElementById('syncDot').classList.remove('connected');
-    document.getElementById('syncText').innerText = "Sync Error / Offline";
+    document.getElementById('syncText').innerText = "Sync Offline";
   });
 
   function getGradientColor(pct) {
@@ -158,6 +192,18 @@
     return `rgb(${r}, ${g}, ${b})`;
   }
 
+  function formatDueDate(dateStr) {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    const date = new Date(parts[0], parts[1] - 1, parts[2]);
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const isOverdue = date < today;
+    const formatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return { formatted, isOverdue };
+  }
+
   function renderTasks() {
     const grid = document.getElementById('taskGrid');
     grid.innerHTML = '';
@@ -171,14 +217,18 @@
 
       const card = document.createElement('div');
       card.className = 'task-card';
+      card.dataset.taskid = task.id;
 
       card.innerHTML = `
         <div class="card-header">
           <div class="card-title-group">
-            <span class="badge ${task.type === 'template' ? 'badge-template' : 'badge-onetime'}">
-              ${task.type === 'template' ? '🔄 Reusable Template' : '📌 One-Time'}
-            </span>
-            <div class="card-title">${escapeHtml(task.title)}</div>
+            <span class="drag-handle-card" title="Drag to reorder card">⠿</span>
+            <div class="card-title-content">
+              <span class="badge ${task.type === 'template' ? 'badge-template' : 'badge-onetime'}">
+                ${task.type === 'template' ? '🔄 Reusable Template' : '📌 One-Time'}
+              </span>
+              <div class="editable-title" contenteditable="true" data-action="editParentTitle" data-taskid="${task.id}">${escapeHtml(task.title)}</div>
+            </div>
           </div>
           <button class="btn-danger" title="Delete Task Box" data-action="deleteTask" data-taskid="${task.id}">✕</button>
         </div>
@@ -193,21 +243,41 @@
           </div>
         </div>
 
-        <ul class="subtask-list">
-          ${subtasks.map(s => `
-            <li class="subtask-item ${s.completed ? 'completed' : ''}">
-              <label class="subtask-left">
-                <input type="checkbox" ${s.completed ? 'checked' : ''} data-action="toggleSubtask" data-taskid="${task.id}" data-subid="${s.id}">
-                <span class="subtask-title">${escapeHtml(s.title)}</span>
-              </label>
-              <button class="btn-danger" data-action="deleteSubtask" data-taskid="${task.id}" data-subid="${s.id}">✕</button>
-            </li>
-          `).join('')}
+        <ul class="subtask-list" id="subtasks-${task.id}" data-taskid="${task.id}">
+          ${subtasks.map(s => {
+            const dueInfo = formatDueDate(s.dueDate);
+            return `
+              <li class="subtask-item ${s.completed ? 'completed' : ''}" data-subid="${s.id}">
+                <div class="subtask-left">
+                  <span class="drag-handle-sub" title="Drag to reorder subtask">⠿</span>
+                  <input type="checkbox" ${s.completed ? 'checked' : ''} data-action="toggleSubtask" data-taskid="${task.id}" data-subid="${s.id}">
+                  <div class="editable-subtask" contenteditable="true" data-action="editSubtaskTitle" data-taskid="${task.id}" data-subid="${s.id}">${escapeHtml(s.title)}</div>
+                </div>
+
+                <div class="subtask-meta">
+                  ${s.priority ? `<span class="prio-badge prio-${s.priority}">${s.priority}</span>` : ''}
+                  ${dueInfo ? `<span class="due-badge ${dueInfo.isOverdue && !s.completed ? 'overdue' : ''}">📅 ${dueInfo.formatted}</span>` : ''}
+                  <button class="btn-danger" data-action="deleteSubtask" data-taskid="${task.id}" data-subid="${s.id}">✕</button>
+                </div>
+              </li>
+            `;
+          }).join('')}
         </ul>
 
-        <div class="input-row">
-          <input type="text" id="subInput-${task.id}" placeholder="Add subtask...">
-          <button class="btn-subtle" data-action="addSubtask" data-taskid="${task.id}">+</button>
+        <div class="sub-input-form">
+          <div class="input-row">
+            <input type="text" id="subInput-${task.id}" placeholder="Add subtask...">
+            <button class="btn-subtle" data-action="addSubtask" data-taskid="${task.id}">+</button>
+          </div>
+          <div class="sub-input-meta-row">
+            <select id="subPrio-${task.id}">
+              <option value="">Priority (None)</option>
+              <option value="high">🔴 High</option>
+              <option value="med">🟡 Med</option>
+              <option value="low">🔵 Low</option>
+            </select>
+            <input type="date" id="subDate-${task.id}">
+          </div>
         </div>
 
         <div class="card-actions">
@@ -219,6 +289,49 @@
         </div>
       `;
       grid.appendChild(card);
+
+      // Initialize subtask drag-and-drop
+      const subListEl = card.querySelector(`#subtasks-${task.id}`);
+      new Sortable(subListEl, {
+        handle: '.drag-handle-sub',
+        animation: 150,
+        ghostClass: 'sortable-ghost',
+        onStart: () => { isInteracting = true; },
+        onEnd: async (evt) => {
+          isInteracting = false;
+          const taskId = evt.to.dataset.taskid;
+          const targetTask = tasks.find(t => t.id === taskId);
+          if (!targetTask) return;
+
+          const newSubOrder = Array.from(evt.to.children).map(li => {
+            const subId = li.dataset.subid;
+            return targetTask.subtasks.find(s => s.id === subId);
+          }).filter(Boolean);
+
+          targetTask.subtasks = newSubOrder;
+          await updateDoc(doc(db, "user_tasks", taskId), { subtasks: newSubOrder });
+        }
+      });
+    });
+
+    // Initialize parent card grid drag-and-drop
+    new Sortable(grid, {
+      handle: '.drag-handle-card',
+      animation: 180,
+      ghostClass: 'sortable-ghost',
+      onStart: () => { isInteracting = true; },
+      onEnd: async () => {
+        isInteracting = false;
+        const cardElements = Array.from(grid.children);
+        cardElements.forEach(async (el, index) => {
+          const taskId = el.dataset.taskid;
+          const taskObj = tasks.find(t => t.id === taskId);
+          if (taskObj) {
+            taskObj.orderIndex = index;
+            await updateDoc(doc(db, "user_tasks", taskId), { orderIndex: index });
+          }
+        });
+      }
     });
   }
 
@@ -234,19 +347,29 @@
       title: title,
       type: typeSelect.value,
       createdAt: Date.now(),
+      orderIndex: -1,
       subtasks: []
     });
     input.value = '';
   };
 
   async function addSubtask(taskId) {
-    const input = document.getElementById(`subInput-${taskId}`);
-    const title = input.value.trim();
+    const titleInput = document.getElementById(`subInput-${taskId}`);
+    const prioInput = document.getElementById(`subPrio-${taskId}`);
+    const dateInput = document.getElementById(`subDate-${taskId}`);
+    const title = titleInput.value.trim();
     if (!title) return;
 
     const task = tasks.find(t => t.id === taskId);
     if (task) {
-      const updated = [...(task.subtasks || []), { id: Date.now().toString(), title, completed: false }];
+      const newSub = {
+        id: Date.now().toString(),
+        title,
+        completed: false,
+        priority: prioInput.value || null,
+        dueDate: dateInput.value || null
+      };
+      const updated = [...(task.subtasks || []), newSub];
       await updateDoc(doc(db, "user_tasks", taskId), { subtasks: updated });
     }
   }
@@ -283,7 +406,8 @@
         title: `${task.title} (Copy)`,
         type: task.type,
         createdAt: Date.now(),
-        subtasks: task.subtasks.map(s => ({ id: Date.now().toString() + Math.random(), title: s.title, completed: false }))
+        orderIndex: (task.orderIndex || 0) + 0.1,
+        subtasks: task.subtasks.map(s => ({ ...s, id: Date.now().toString() + Math.random(), completed: false }))
       });
     }
   }
@@ -296,9 +420,9 @@
     return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
   }
 
-  // Event Listeners
+  // Listeners & Inline Editing
   document.getElementById('createBtn').addEventListener('click', window.createParentTask);
-  document.getElementById('parentInput').addEventListener('keydown', (e) => { if(e.key === 'Enter') window.createParentTask(); });
+  document.getElementById('parentInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') window.createParentTask(); });
 
   document.getElementById('taskGrid').addEventListener('click', (e) => {
     const target = e.target.closest('[data-action]');
@@ -321,11 +445,47 @@
   });
 
   document.getElementById('taskGrid').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && e.target.id && e.target.id.startsWith('subInput-')) {
-      const taskId = e.target.id.replace('subInput-', '');
-      addSubtask(taskId);
+    if (e.key === 'Enter') {
+      if (e.target.id && e.target.id.startsWith('subInput-')) {
+        const taskId = e.target.id.replace('subInput-', '');
+        addSubtask(taskId);
+      } else if (e.target.isContentEditable) {
+        e.preventDefault();
+        e.target.blur(); // Triggers blur listener to commit update
+      }
     }
   });
+
+  // Save Inline Edits on Blur
+  document.getElementById('taskGrid').addEventListener('blur', async (e) => {
+    if (!e.target.isContentEditable) return;
+    isInteracting = false;
+    const action = e.target.dataset.action;
+    const taskId = e.target.dataset.taskid;
+    const newText = e.target.innerText.trim();
+
+    if (action === 'editParentTitle') {
+      const task = tasks.find(t => t.id === taskId);
+      if (task && newText && newText !== task.title) {
+        task.title = newText;
+        await updateDoc(doc(db, "user_tasks", taskId), { title: newText });
+      }
+    } else if (action === 'editSubtaskTitle') {
+      const subId = e.target.dataset.subid;
+      const task = tasks.find(t => t.id === taskId);
+      if (task) {
+        const sub = task.subtasks.find(s => s.id === subId);
+        if (sub && newText && newText !== sub.title) {
+          sub.title = newText;
+          await updateDoc(doc(db, "user_tasks", taskId), { subtasks: task.subtasks });
+        }
+      }
+    }
+  }, true);
+
+  document.getElementById('taskGrid').addEventListener('focus', (e) => {
+    if (e.target.isContentEditable) isInteracting = true;
+  }, true);
 </script>
 </body>
 </html>
