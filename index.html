@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cloud Task Flow Manager</title>
+  <title>Mark B-Fresh Task Flow</title>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
   <style>
     :root {
@@ -25,21 +25,33 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: var(--bg); color: var(--text); padding: 24px 16px; display: flex; justify-content: center; min-height: 100vh; }
-    .container { width: 100%; max-width: 960px; display: flex; flex-direction: column; gap: 20px; }
+    .container { width: 100%; max-width: 980px; display: flex; flex-direction: column; gap: 18px; }
 
     /* Header & Sync Status */
-    header { display: flex; flex-direction: column; gap: 12px; }
-    .header-top { display: flex; justify-content: space-between; align-items: center; }
+    header { display: flex; flex-direction: column; gap: 14px; }
+    .header-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
     h1 { font-size: 1.75rem; font-weight: 700; }
+    .header-actions { display: flex; align-items: center; gap: 12px; }
     .sync-status { font-size: 0.8rem; display: flex; align-items: center; gap: 6px; color: var(--text-muted); }
     .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #eab308; }
     .sync-dot.connected { background: var(--success); }
 
+    /* Search & Filter Bar */
+    .controls-bar { display: flex; flex-direction: column; gap: 10px; }
+    .search-row { display: flex; gap: 8px; }
+    .search-input { flex: 1; background: #0b1120; border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 0.95rem; }
+    .search-input:focus { outline: 2px solid var(--primary); border-color: transparent; }
+
+    .category-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+    .tab-btn { background: #1e293b; color: var(--text-muted); border: 1px solid var(--border); border-radius: 20px; padding: 6px 14px; font-size: 0.85rem; font-weight: 600; cursor: pointer; white-space: nowrap; transition: 0.2s; }
+    .tab-btn:hover { background: #334155; color: var(--text); }
+    .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
     /* Creation Form */
-    .create-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .create-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
     .input-row { display: flex; gap: 8px; flex-wrap: wrap; }
-    input[type="text"], input[type="date"], select { background: #0b1120; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text); font-size: 0.9rem; }
-    input[type="text"]:focus, input[type="date"]:focus, select:focus { outline: 2px solid var(--primary); border-color: transparent; }
+    input[type="text"], input[type="date"], select, textarea { background: #0b1120; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text); font-size: 0.9rem; }
+    input[type="text"]:focus, input[type="date"]:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); border-color: transparent; }
     input[type="text"] { flex: 1; min-width: 180px; }
     input[type="date"] { color-scheme: dark; }
 
@@ -51,54 +63,68 @@
     button.btn-danger:hover { background: rgba(239, 68, 68, 0.1); }
 
     /* Tasks Grid */
-    .task-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; }
+    .task-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(430px, 1fr)); gap: 16px; }
     @media (max-width: 640px) { .task-grid { grid-template-columns: 1fr; } }
 
-    /* Parent Task Card */
-    .task-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2); }
+    /* Parent Task Card & Themes */
+    .task-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2); transition: border-color 0.2s; }
+    .task-card.theme-blue { border-top: 4px solid #3b82f6; }
+    .task-card.theme-purple { border-top: 4px solid #a855f7; }
+    .task-card.theme-emerald { border-top: 4px solid #10b981; }
+    .task-card.theme-amber { border-top: 4px solid #f59e0b; }
+    .task-card.theme-rose { border-top: 4px solid #f43f5e; }
+    .task-card.theme-slate { border-top: 4px solid #64748b; }
+
     .card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-    .card-title-group { display: flex; align-items: flex-start; gap: 10px; flex: 1; }
-    .card-title-content { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+    .card-title-group { display: flex; align-items: flex-start; gap: 8px; flex: 1; }
+    .caret-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 4px; font-size: 0.85rem; line-height: 1; transition: transform 0.2s; }
+    .caret-btn:hover { color: var(--text); }
     
-    /* Inline Editable Titles */
-    .editable-title { font-size: 1.15rem; font-weight: 600; border-radius: 4px; padding: 2px 6px; cursor: text; border: 1px solid transparent; transition: background 0.15s, border-color 0.15s; outline: none; }
+    .card-title-content { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+    .card-meta-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    
+    .editable-title { font-size: 1.1rem; font-weight: 600; border-radius: 4px; padding: 2px 4px; cursor: text; border: 1px solid transparent; outline: none; }
     .editable-title:hover { background: rgba(255, 255, 255, 0.05); border-color: var(--border); }
     .editable-title:focus { background: #0b1120; border-color: var(--primary); }
 
-    .badge { font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 6px; width: fit-content; text-transform: uppercase; }
+    .badge { font-size: 0.7rem; font-weight: 600; padding: 2px 6px; border-radius: 6px; text-transform: uppercase; }
     .badge-template { background: rgba(139, 92, 246, 0.2); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.3); }
     .badge-onetime { background: rgba(14, 165, 233, 0.2); color: #7dd3fc; border: 1px solid rgba(14, 165, 233, 0.3); }
+    .badge-category { background: rgba(255, 255, 255, 0.1); color: var(--text); border: 1px solid rgba(255, 255, 255, 0.15); }
 
     /* Drag Handles */
-    .drag-handle-card, .drag-handle-sub { cursor: grab; color: var(--text-muted); font-size: 1.2rem; line-height: 1; padding: 2px 4px; opacity: 0.6; user-select: none; }
+    .drag-handle-card, .drag-handle-sub { cursor: grab; color: var(--text-muted); font-size: 1.1rem; line-height: 1; padding: 2px; opacity: 0.6; user-select: none; }
     .drag-handle-card:hover, .drag-handle-sub:hover { opacity: 1; color: var(--text); }
     .drag-handle-card:active, .drag-handle-sub:active { cursor: grabbing; }
     .sortable-ghost { opacity: 0.35; background: rgba(59, 130, 246, 0.15) !important; border: 1px dashed var(--primary) !important; }
 
     /* Progress Bar */
-    .progress-container { display: flex; flex-direction: column; gap: 6px; }
-    .progress-labels { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted); }
-    .progress-track { width: 100%; height: 8px; background: #0b1120; border-radius: 999px; overflow: hidden; }
+    .progress-container { display: flex; flex-direction: column; gap: 5px; }
+    .progress-labels { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-muted); }
+    .progress-track { width: 100%; height: 7px; background: #0b1120; border-radius: 999px; overflow: hidden; }
     .progress-fill { height: 100%; width: 0%; border-radius: 999px; transition: width 0.3s ease, background-color 0.3s ease; }
 
-    /* Subtask List */
-    .subtask-list { display: flex; flex-direction: column; gap: 8px; list-style: none; min-height: 6px; }
-    .subtask-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #0b1120; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03); }
+    /* Collapsible Body */
+    .card-collapsible { display: flex; flex-direction: column; gap: 12px; }
+    .card-collapsible.collapsed { display: none; }
+
+    /* Subtasks */
+    .subtask-list { display: flex; flex-direction: column; gap: 6px; list-style: none; min-height: 4px; }
+    .subtask-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #0b1120; padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03); }
     .subtask-left { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
-    .subtask-item input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--success); flex-shrink: 0; }
+    .subtask-item input[type="checkbox"] { width: 17px; height: 17px; cursor: pointer; accent-color: var(--success); flex-shrink: 0; }
     
-    .editable-subtask { font-size: 0.95rem; color: var(--text); border-radius: 4px; padding: 2px 4px; cursor: text; border: 1px solid transparent; flex: 1; min-width: 0; overflow-wrap: break-word; outline: none; }
+    .editable-subtask { font-size: 0.9rem; color: var(--text); border-radius: 4px; padding: 2px 4px; cursor: text; border: 1px solid transparent; flex: 1; min-width: 0; overflow-wrap: break-word; outline: none; }
     .editable-subtask:hover { background: rgba(255, 255, 255, 0.05); border-color: var(--border); }
     .editable-subtask:focus { background: var(--card-bg); border-color: var(--primary); }
     .subtask-item.completed .editable-subtask { text-decoration: line-through; color: var(--text-muted); opacity: 0.7; }
 
-    /* Meta Badges (Priority / Due Date) */
     .subtask-meta { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-    .prio-badge { font-size: 0.7rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; text-transform: uppercase; }
+    .prio-badge { font-size: 0.68rem; font-weight: 700; padding: 1px 5px; border-radius: 4px; text-transform: uppercase; }
     .prio-high { background: rgba(239, 68, 68, 0.2); color: var(--prio-high); border: 1px solid rgba(239, 68, 68, 0.4); }
     .prio-med { background: rgba(245, 158, 11, 0.2); color: var(--prio-med); border: 1px solid rgba(245, 158, 11, 0.4); }
     .prio-low { background: rgba(56, 189, 248, 0.2); color: var(--prio-low); border: 1px solid rgba(56, 189, 248, 0.4); }
-    .due-badge { font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 3px; }
+    .due-badge { font-size: 0.72rem; color: var(--text-muted); }
     .due-badge.overdue { color: var(--danger); font-weight: 600; }
 
     /* Subtask Input Form Controls */
@@ -106,7 +132,14 @@
     .sub-input-meta-row { display: flex; gap: 6px; flex-wrap: wrap; }
 
     /* Card Actions */
-    .card-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 8px; border-top: 1px solid var(--border); }
+    .card-actions { display: flex; gap: 8px; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .card-actions-right { display: flex; gap: 6px; }
+
+    /* Import Modal */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+    .modal-backdrop.open { display: flex; }
+    .modal-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; width: 100%; max-width: 500px; padding: 20px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    .modal-box textarea { width: 100%; height: 160px; resize: vertical; }
   </style>
 </head>
 <body>
@@ -114,18 +147,42 @@
 <div class="container">
   <header>
     <div class="header-top">
-      <h1>Cloud Task Flow</h1>
-      <div class="sync-status">
-        <span class="sync-dot" id="syncDot"></span>
-        <span id="syncText">Connecting to Cloud...</span>
+      <h1>Mark B-Fresh Task Flow</h1>
+      <div class="header-actions">
+        <button class="btn-subtle" id="openImportBtn">📋 Import Keep/Tasks</button>
+        <div class="sync-status">
+          <span class="sync-dot" id="syncDot"></span>
+          <span id="syncText">Connecting...</span>
+        </div>
       </div>
     </div>
+
+    <!-- Controls Bar: Search + Category Tabs -->
+    <div class="controls-bar">
+      <div class="search-row">
+        <input type="text" id="searchInput" class="search-input" placeholder="🔍 Search parent boxes or subtasks...">
+      </div>
+      <div class="category-tabs" id="categoryTabs">
+        <button class="tab-btn active" data-cat="ALL">All Boxes</button>
+      </div>
+    </div>
+
+    <!-- Create Card Form -->
     <div class="create-card">
       <div class="input-row">
-        <input type="text" id="parentInput" placeholder="Add parent task box (e.g. Wedding Setup, Invoicing, Car Maintenance)...">
+        <input type="text" id="parentInput" placeholder="Add parent task box...">
+        <input type="text" id="categoryInput" placeholder="Folder/Category (e.g. Gigs, Admin, Personal)" style="max-width: 220px;">
+        <select id="colorSelect">
+          <option value="blue">🔵 Blue Theme</option>
+          <option value="purple">🟣 Purple Theme</option>
+          <option value="emerald">🟢 Emerald Theme</option>
+          <option value="amber">🟡 Amber Theme</option>
+          <option value="rose">🔴 Rose Theme</option>
+          <option value="slate">⚪ Slate Theme</option>
+        </select>
         <select id="typeSelect">
-          <option value="template">Reusable Template</option>
-          <option value="onetime">One-Time Use</option>
+          <option value="template">🔄 Reusable Template</option>
+          <option value="onetime">📌 One-Time Use</option>
         </select>
         <button id="createBtn">+ Create Task</button>
       </div>
@@ -135,12 +192,32 @@
   <div class="task-grid" id="taskGrid"></div>
 </div>
 
+<!-- Import Modal (Google Keep / Google Tasks) -->
+<div class="modal-backdrop" id="importModal">
+  <div class="modal-box">
+    <h3>Import from Google Keep or Tasks</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">Paste your task list below. Line 1 will become the Box Title, and following lines will become individual subtasks.</p>
+    <textarea id="importText" placeholder="Event Gear Checklist&#10;Pack DMX cables&#10;Charge wireless mics&#10;Export Rekordbox USBs"></textarea>
+    <div class="input-row">
+      <input type="text" id="importCategory" placeholder="Category (optional)" style="flex:1;">
+      <select id="importType">
+        <option value="template">Reusable Template</option>
+        <option value="onetime">One-Time Use</option>
+      </select>
+    </div>
+    <div style="display: flex; justify-content: flex-end; gap: 8px;">
+      <button class="btn-subtle" id="closeImportBtn">Cancel</button>
+      <button id="processImportBtn">Import Box</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-  // --- PASTE YOUR FIREBASE CONFIG HERE ---
-const firebaseConfig = {
+  // Pre-configured Firebase Keys
+  const firebaseConfig = {
     apiKey: "AIzaSyAowTWapsWI-NosV5sn1xBpoUVMzp73XS0",
     authDomain: "markbfresh-task-app.firebaseapp.com",
     projectId: "markbfresh-task-app",
@@ -155,12 +232,14 @@ const firebaseConfig = {
 
   let tasks = [];
   let isInteracting = false;
+  let activeCategory = 'ALL';
+  let searchQuery = '';
 
   onSnapshot(tasksCol, (snapshot) => {
     document.getElementById('syncDot').classList.add('connected');
     document.getElementById('syncText').innerText = "Live Cloud Sync Active";
     
-    if (isInteracting) return; // Prevent overwriting active input/drag focus
+    if (isInteracting) return;
 
     tasks = [];
     snapshot.forEach(docSnap => {
@@ -168,6 +247,7 @@ const firebaseConfig = {
     });
     
     tasks.sort((a, b) => (a.orderIndex ?? (b.createdAt || 0)) - (b.orderIndex ?? (a.createdAt || 0)));
+    renderCategoryTabs();
     renderTasks();
   }, (error) => {
     console.error("Firebase sync error:", error);
@@ -204,29 +284,58 @@ const firebaseConfig = {
     return { formatted, isOverdue };
   }
 
+  function renderCategoryTabs() {
+    const tabsContainer = document.getElementById('categoryTabs');
+    const categories = Array.from(new Set(tasks.map(t => t.category).filter(Boolean)));
+    
+    tabsContainer.innerHTML = `
+      <button class="tab-btn ${activeCategory === 'ALL' ? 'active' : ''}" data-cat="ALL">All Boxes (${tasks.length})</button>
+      ${categories.map(cat => {
+        const count = tasks.filter(t => t.category === cat).length;
+        return `<button class="tab-btn ${activeCategory === cat ? 'active' : ''}" data-cat="${escapeHtml(cat)}">${escapeHtml(cat)} (${count})</button>`;
+      }).join('')}
+    `;
+  }
+
   function renderTasks() {
     const grid = document.getElementById('taskGrid');
     grid.innerHTML = '';
 
-    tasks.forEach(task => {
+    const filtered = tasks.filter(task => {
+      const matchesCategory = activeCategory === 'ALL' || task.category === activeCategory;
+      const q = searchQuery.toLowerCase();
+      const matchesSearch = !q || 
+        task.title.toLowerCase().includes(q) || 
+        (task.subtasks && task.subtasks.some(s => s.title.toLowerCase().includes(q)));
+      return matchesCategory && matchesSearch;
+    });
+
+    filtered.forEach(task => {
       const subtasks = task.subtasks || [];
       const completedCount = subtasks.filter(s => s.completed).length;
       const totalCount = subtasks.length;
       const pct = totalCount === 0 ? 0 : Math.round((completedCount / totalCount) * 100);
       const barColor = getGradientColor(pct);
+      const isCollapsed = !!task.collapsed;
 
       const card = document.createElement('div');
-      card.className = 'task-card';
+      card.className = `task-card theme-${task.colorTheme || 'blue'}`;
       card.dataset.taskid = task.id;
 
       card.innerHTML = `
         <div class="card-header">
           <div class="card-title-group">
+            <button class="caret-btn" data-action="toggleCollapse" data-taskid="${task.id}" title="Show/Hide Subtasks">
+              ${isCollapsed ? '▶' : '▼'}
+            </button>
             <span class="drag-handle-card" title="Drag to reorder card">⠿</span>
             <div class="card-title-content">
-              <span class="badge ${task.type === 'template' ? 'badge-template' : 'badge-onetime'}">
-                ${task.type === 'template' ? '🔄 Reusable Template' : '📌 One-Time'}
-              </span>
+              <div class="card-meta-line">
+                <span class="badge ${task.type === 'template' ? 'badge-template' : 'badge-onetime'}">
+                  ${task.type === 'template' ? '🔄 Template' : '📌 One-Time'}
+                </span>
+                ${task.category ? `<span class="badge badge-category">📁 ${escapeHtml(task.category)}</span>` : ''}
+              </div>
               <div class="editable-title" contenteditable="true" data-action="editParentTitle" data-taskid="${task.id}">${escapeHtml(task.title)}</div>
             </div>
           </div>
@@ -243,54 +352,68 @@ const firebaseConfig = {
           </div>
         </div>
 
-        <ul class="subtask-list" id="subtasks-${task.id}" data-taskid="${task.id}">
-          ${subtasks.map(s => {
-            const dueInfo = formatDueDate(s.dueDate);
-            return `
-              <li class="subtask-item ${s.completed ? 'completed' : ''}" data-subid="${s.id}">
-                <div class="subtask-left">
-                  <span class="drag-handle-sub" title="Drag to reorder subtask">⠿</span>
-                  <input type="checkbox" ${s.completed ? 'checked' : ''} data-action="toggleSubtask" data-taskid="${task.id}" data-subid="${s.id}">
-                  <div class="editable-subtask" contenteditable="true" data-action="editSubtaskTitle" data-taskid="${task.id}" data-subid="${s.id}">${escapeHtml(s.title)}</div>
-                </div>
+        <div class="card-collapsible ${isCollapsed ? 'collapsed' : ''}" id="body-${task.id}">
+          <ul class="subtask-list" id="subtasks-${task.id}" data-taskid="${task.id}">
+            ${subtasks.map(s => {
+              const dueInfo = formatDueDate(s.dueDate);
+              return `
+                <li class="subtask-item ${s.completed ? 'completed' : ''}" data-subid="${s.id}">
+                  <div class="subtask-left">
+                    <span class="drag-handle-sub" title="Drag to reorder subtask">⠿</span>
+                    <input type="checkbox" ${s.completed ? 'checked' : ''} data-action="toggleSubtask" data-taskid="${task.id}" data-subid="${s.id}">
+                    <div class="editable-subtask" contenteditable="true" data-action="editSubtaskTitle" data-taskid="${task.id}" data-subid="${s.id}">${escapeHtml(s.title)}</div>
+                  </div>
 
-                <div class="subtask-meta">
-                  ${s.priority ? `<span class="prio-badge prio-${s.priority}">${s.priority}</span>` : ''}
-                  ${dueInfo ? `<span class="due-badge ${dueInfo.isOverdue && !s.completed ? 'overdue' : ''}">📅 ${dueInfo.formatted}</span>` : ''}
-                  <button class="btn-danger" data-action="deleteSubtask" data-taskid="${task.id}" data-subid="${s.id}">✕</button>
-                </div>
-              </li>
-            `;
-          }).join('')}
-        </ul>
+                  <div class="subtask-meta">
+                    ${s.priority ? `<span class="prio-badge prio-${s.priority}">${s.priority}</span>` : ''}
+                    ${dueInfo ? `<span class="due-badge ${dueInfo.isOverdue && !s.completed ? 'overdue' : ''}">📅 ${dueInfo.formatted}</span>` : ''}
+                    <button class="btn-danger" data-action="deleteSubtask" data-taskid="${task.id}" data-subid="${s.id}">✕</button>
+                  </div>
+                </li>
+              `;
+            }).join('')}
+          </ul>
 
-        <div class="sub-input-form">
-          <div class="input-row">
-            <input type="text" id="subInput-${task.id}" placeholder="Add subtask...">
-            <button class="btn-subtle" data-action="addSubtask" data-taskid="${task.id}">+</button>
+          <div class="sub-input-form">
+            <div class="input-row">
+              <input type="text" id="subInput-${task.id}" placeholder="Add subtask...">
+              <button class="btn-subtle" data-action="addSubtask" data-taskid="${task.id}">+</button>
+            </div>
+            <div class="sub-input-meta-row">
+              <select id="subPrio-${task.id}">
+                <option value="">Priority (None)</option>
+                <option value="high">🔴 High</option>
+                <option value="med">🟡 Med</option>
+                <option value="low">🔵 Low</option>
+              </select>
+              <input type="date" id="subDate-${task.id}">
+            </div>
           </div>
-          <div class="sub-input-meta-row">
-            <select id="subPrio-${task.id}">
-              <option value="">Priority (None)</option>
-              <option value="high">🔴 High</option>
-              <option value="med">🟡 Med</option>
-              <option value="low">🔵 Low</option>
-            </select>
-            <input type="date" id="subDate-${task.id}">
-          </div>
-        </div>
 
-        <div class="card-actions">
-          ${task.type === 'template' ? `
-            <button class="btn-subtle" data-action="resetChecks" data-taskid="${task.id}">Reset Checks</button>
-            <button class="btn-subtle" data-action="duplicateTask" data-taskid="${task.id}">Duplicate</button>
-          ` : ''}
-          <button class="btn-danger" data-action="deleteTask" data-taskid="${task.id}">Delete Box</button>
+          <div class="card-actions">
+            <div>
+              <select data-action="changeColor" data-taskid="${task.id}" style="font-size:0.75rem; padding:4px 6px;">
+                <option value="blue" ${task.colorTheme === 'blue' ? 'selected' : ''}>🔵 Blue</option>
+                <option value="purple" ${task.colorTheme === 'purple' ? 'selected' : ''}>🟣 Purple</option>
+                <option value="emerald" ${task.colorTheme === 'emerald' ? 'selected' : ''}>🟢 Emerald</option>
+                <option value="amber" ${task.colorTheme === 'amber' ? 'selected' : ''}>🟡 Amber</option>
+                <option value="rose" ${task.colorTheme === 'rose' ? 'selected' : ''}>🔴 Rose</option>
+                <option value="slate" ${task.colorTheme === 'slate' ? 'selected' : ''}>⚪ Slate</option>
+              </select>
+            </div>
+            <div class="card-actions-right">
+              ${task.type === 'template' ? `
+                <button class="btn-subtle" data-action="resetChecks" data-taskid="${task.id}">Reset Checks</button>
+                <button class="btn-subtle" data-action="duplicateTask" data-taskid="${task.id}">Duplicate</button>
+              ` : ''}
+              <button class="btn-danger" data-action="deleteTask" data-taskid="${task.id}">Delete Box</button>
+            </div>
+          </div>
         </div>
       `;
       grid.appendChild(card);
 
-      // Initialize subtask drag-and-drop
+      // Subtask drag-and-drop
       const subListEl = card.querySelector(`#subtasks-${task.id}`);
       new Sortable(subListEl, {
         handle: '.drag-handle-sub',
@@ -314,7 +437,7 @@ const firebaseConfig = {
       });
     });
 
-    // Initialize parent card grid drag-and-drop
+    // Parent card grid drag-and-drop
     new Sortable(grid, {
       handle: '.drag-handle-card',
       animation: 180,
@@ -338,6 +461,8 @@ const firebaseConfig = {
   // Cloud Actions
   window.createParentTask = async () => {
     const input = document.getElementById('parentInput');
+    const categoryInput = document.getElementById('categoryInput');
+    const colorSelect = document.getElementById('colorSelect');
     const typeSelect = document.getElementById('typeSelect');
     const title = input.value.trim();
     if (!title) return;
@@ -345,12 +470,16 @@ const firebaseConfig = {
     const id = Date.now().toString();
     await setDoc(doc(db, "user_tasks", id), {
       title: title,
+      category: categoryInput.value.trim() || null,
+      colorTheme: colorSelect.value || 'blue',
       type: typeSelect.value,
       createdAt: Date.now(),
       orderIndex: -1,
+      collapsed: false,
       subtasks: []
     });
     input.value = '';
+    categoryInput.value = '';
   };
 
   async function addSubtask(taskId) {
@@ -371,6 +500,15 @@ const firebaseConfig = {
       };
       const updated = [...(task.subtasks || []), newSub];
       await updateDoc(doc(db, "user_tasks", taskId), { subtasks: updated });
+    }
+  }
+
+  async function toggleCollapse(taskId) {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      task.collapsed = !task.collapsed;
+      renderTasks();
+      await updateDoc(doc(db, "user_tasks", taskId), { collapsed: task.collapsed });
     }
   }
 
@@ -404,9 +542,12 @@ const firebaseConfig = {
       const newId = Date.now().toString();
       await setDoc(doc(db, "user_tasks", newId), {
         title: `${task.title} (Copy)`,
+        category: task.category || null,
+        colorTheme: task.colorTheme || 'blue',
         type: task.type,
         createdAt: Date.now(),
         orderIndex: (task.orderIndex || 0) + 0.1,
+        collapsed: false,
         subtasks: task.subtasks.map(s => ({ ...s, id: Date.now().toString() + Math.random(), completed: false }))
       });
     }
@@ -417,13 +558,29 @@ const firebaseConfig = {
   }
 
   function escapeHtml(str) {
-    return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
+    return (str || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
   }
 
-  // Listeners & Inline Editing
+  // Event Listeners
   document.getElementById('createBtn').addEventListener('click', window.createParentTask);
   document.getElementById('parentInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') window.createParentTask(); });
 
+  // Search Filter
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+    searchQuery = e.target.value;
+    renderTasks();
+  });
+
+  // Category Tab Click
+  document.getElementById('categoryTabs').addEventListener('click', (e) => {
+    const btn = e.target.closest('.tab-btn');
+    if (!btn) return;
+    activeCategory = btn.dataset.cat;
+    renderCategoryTabs();
+    renderTasks();
+  });
+
+  // Task Grid Actions
   document.getElementById('taskGrid').addEventListener('click', (e) => {
     const target = e.target.closest('[data-action]');
     if (!target) return;
@@ -431,6 +588,7 @@ const firebaseConfig = {
     const taskId = target.dataset.taskid;
     const subId = target.dataset.subid;
 
+    if (action === 'toggleCollapse') toggleCollapse(taskId);
     if (action === 'deleteTask') deleteTask(taskId);
     if (action === 'addSubtask') addSubtask(taskId);
     if (action === 'resetChecks') resetChecks(taskId);
@@ -441,6 +599,15 @@ const firebaseConfig = {
   document.getElementById('taskGrid').addEventListener('change', (e) => {
     if (e.target.dataset.action === 'toggleSubtask') {
       toggleSubtask(e.target.dataset.taskid, e.target.dataset.subid);
+    } else if (e.target.dataset.action === 'changeColor') {
+      const taskId = e.target.dataset.taskid;
+      const theme = e.target.value;
+      const task = tasks.find(t => t.id === taskId);
+      if (task) {
+        task.colorTheme = theme;
+        updateDoc(doc(db, "user_tasks", taskId), { colorTheme: theme });
+        renderTasks();
+      }
     }
   });
 
@@ -451,7 +618,7 @@ const firebaseConfig = {
         addSubtask(taskId);
       } else if (e.target.isContentEditable) {
         e.preventDefault();
-        e.target.blur(); // Triggers blur listener to commit update
+        e.target.blur();
       }
     }
   });
@@ -486,6 +653,43 @@ const firebaseConfig = {
   document.getElementById('taskGrid').addEventListener('focus', (e) => {
     if (e.target.isContentEditable) isInteracting = true;
   }, true);
+
+  // Keep / Tasks Import Modal
+  const modal = document.getElementById('importModal');
+  document.getElementById('openImportBtn').addEventListener('click', () => modal.classList.add('open'));
+  document.getElementById('closeImportBtn').addEventListener('click', () => modal.classList.remove('open'));
+
+  document.getElementById('processImportBtn').addEventListener('click', async () => {
+    const rawText = document.getElementById('importText').value.trim();
+    const category = document.getElementById('importCategory').value.trim() || null;
+    const type = document.getElementById('importType').value;
+    if (!rawText) return;
+
+    const lines = rawText.split('\n').map(l => l.replace(/^[-*•\d.)\]\s]+/, '').trim()).filter(Boolean);
+    if (lines.length === 0) return;
+
+    const title = lines[0];
+    const subtaskTitles = lines.slice(1);
+
+    const id = Date.now().toString();
+    await setDoc(doc(db, "user_tasks", id), {
+      title: title,
+      category: category,
+      colorTheme: 'purple',
+      type: type,
+      createdAt: Date.now(),
+      orderIndex: -1,
+      collapsed: false,
+      subtasks: subtaskTitles.map(st => ({
+        id: Date.now().toString() + Math.random(),
+        title: st,
+        completed: false
+      }))
+    });
+
+    document.getElementById('importText').value = '';
+    modal.classList.remove('open');
+  });
 </script>
 </body>
 </html>
