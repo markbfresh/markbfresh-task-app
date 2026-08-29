@@ -90,7 +90,11 @@
     .badge { font-size: 0.7rem; font-weight: 600; padding: 2px 6px; border-radius: 6px; text-transform: uppercase; }
     .badge-template { background: rgba(139, 92, 246, 0.2); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.3); }
     .badge-onetime { background: rgba(14, 165, 233, 0.2); color: #7dd3fc; border: 1px solid rgba(14, 165, 233, 0.3); }
-    .badge-category { background: rgba(255, 255, 255, 0.1); color: var(--text); border: 1px solid rgba(255, 255, 255, 0.15); }
+    
+    /* Inline Editable Category Badge */
+    .badge-category { background: rgba(255, 255, 255, 0.08); color: var(--text); border: 1px dashed rgba(255, 255, 255, 0.25); cursor: text; outline: none; transition: 0.15s; }
+    .badge-category:hover { background: rgba(255, 255, 255, 0.15); border-color: var(--primary); }
+    .badge-category:focus { background: #0b1120; border-color: var(--primary); border-style: solid; }
 
     /* Drag Handles */
     .drag-handle-card, .drag-handle-sub { cursor: grab; color: var(--text-muted); font-size: 1.1rem; line-height: 1; padding: 2px; opacity: 0.6; user-select: none; }
@@ -192,7 +196,7 @@
   <div class="task-grid" id="taskGrid"></div>
 </div>
 
-<!-- Import Modal (Google Keep / Google Tasks) -->
+<!-- Import Modal -->
 <div class="modal-backdrop" id="importModal">
   <div class="modal-box">
     <h3>Import from Google Keep or Tasks</h3>
@@ -334,7 +338,8 @@
                 <span class="badge ${task.type === 'template' ? 'badge-template' : 'badge-onetime'}">
                   ${task.type === 'template' ? '🔄 Template' : '📌 One-Time'}
                 </span>
-                ${task.category ? `<span class="badge badge-category">📁 ${escapeHtml(task.category)}</span>` : ''}
+                <!-- Inline Editable Folder Badge -->
+                <span class="badge badge-category" contenteditable="true" data-action="editCategory" data-taskid="${task.id}" title="Click to edit/assign category folder">📁 ${escapeHtml(task.category || '+ Add Folder')}</span>
               </div>
               <div class="editable-title" contenteditable="true" data-action="editParentTitle" data-taskid="${task.id}">${escapeHtml(task.title)}</div>
             </div>
@@ -629,13 +634,23 @@
     isInteracting = false;
     const action = e.target.dataset.action;
     const taskId = e.target.dataset.taskid;
-    const newText = e.target.innerText.trim();
+    let newText = e.target.innerText.trim();
 
     if (action === 'editParentTitle') {
       const task = tasks.find(t => t.id === taskId);
       if (task && newText && newText !== task.title) {
         task.title = newText;
         await updateDoc(doc(db, "user_tasks", taskId), { title: newText });
+      }
+    } else if (action === 'editCategory') {
+      const task = tasks.find(t => t.id === taskId);
+      // Strip out the leading folder emoji or placeholder text
+      newText = newText.replace(/^[📁\s]+/, '').replace(/^\+ Add Folder$/, '').trim();
+      if (task) {
+        task.category = newText || null;
+        await updateDoc(doc(db, "user_tasks", taskId), { category: task.category });
+        renderCategoryTabs();
+        renderTasks();
       }
     } else if (action === 'editSubtaskTitle') {
       const subId = e.target.dataset.subid;
